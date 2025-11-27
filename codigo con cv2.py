@@ -26,24 +26,15 @@ def procesar_imagen(nombre_de_imagen):
     """
     img_array = cv2.imread(nombre_de_imagen, cv2.IMREAD_GRAYSCALE)
     nueva_img = cv2.resize(img_array, (8, 8))
-    i = 0
-    while i < 8:
-        j = 0
-        while j < 8:
-            nueva_img[i][j] = 255 - nueva_img[i][j]
-            j = j + 1
-        i = i + 1
+    img_array = cv2.imread(nombre_de_imagen, cv2.IMREAD_GRAYSCALE)
+    nueva_img = cv2.resize(img_array, (8, 8))
 
-    i = 0
-    while i < 8:
-        j = 0
-        while j < 8:
-            nueva_img[i][j] = nueva_img[i][j] / 255 * 16
-            j = j + 1
-        i = i + 1
+    # ESTAS 2 LÍNEAS hacen lo mismo que tus 16 líneas:
+    imagen_invertida = 255 - nueva_img
+    imagen_procesada = (imagen_invertida * 16) // 255
 
-    print(nueva_img)
-    return nueva_img
+    print(imagen_procesada)
+    return imagen_procesada
 
 # ============================================================================
 # PASO 4: Calcular distancia euclidiana
