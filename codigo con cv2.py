@@ -31,7 +31,7 @@ def procesar_imagen(nombre_de_imagen):
 
     # ESTAS 2 LÍNEAS hacen lo mismo que tus 16 líneas:
     imagen_invertida = 255 - nueva_img
-    imagen_procesada = (imagen_invertida * 16) // 255
+    imagen_procesada = (imagen_invertida //16) * 255
 
     print(imagen_procesada)
     return imagen_procesada
