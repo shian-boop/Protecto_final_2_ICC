@@ -1,176 +1,118 @@
 # ============================================================================
 # PASO 1: Importar librerías
 # ============================================================================
-
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn import datasets
 import cv2
-from collections import Counter
 
 # ============================================================================
 # PASO 2: Cargar el dataset
 # ============================================================================
 
 misDatos = datasets.load_digits()
-imagenes_dataset = misDatos.images    # imágenes 8x8
-datos_dataset = misDatos.data         # datos aplanados (1797, 64)
-etiquetas_dataset = misDatos.target
+imagenes_dataset = misDatos["images"]
+datos_dataset = misDatos["data"]
+etiquetas_dataset = misDatos["target"]
 
 # ============================================================================
 # PASO 3: Procesar imagenes
 # ============================================================================
-
 def procesar_imagen(nombre_de_imagen):
+    """ Pasos:
+    1. Leer imagen en escala de grises
+    2. Redimensionar a 8x8 píxeles
+    3. Invertir colores de la imagen
+    4. Convertir a escala de 1 a 16
     """
-    Pasos:
-    1. Leer imagen en blanco y negro
-    2. Reducirla a 8x8 pixeles
-    3. Invertir la escala (los colores)
-    4. Reducir los valores a un rango de 0-16
-    """
-    # 1. Leer imagen
-    imagen = cv2.imread(nombre_de_imagen, cv2.IMREAD_GRAYSCALE)
+    img_array = cv2.imread(nombre_de_imagen, cv2.IMREAD_GRAYSCALE)
+    nueva_img = cv2.resize(img_array, (8, 8))
+    i = 0
+    while i < 8:
+        j = 0
+        while j < 8:
+            nueva_img[i][j] = 255 - nueva_img[i][j]
+            j = j + 1
+        i = i + 1
 
-    # 2. Redimensionar a 8x8 píxeles
-    imagen_8x8 = cv2.resize(imagen, (8, 8))
+    i = 0
+    while i < 8:
+        j = 0
+        while j < 8:
+            nueva_img[i][j] = nueva_img[i][j] / 255 * 16
+            j = j + 1
+        i = i + 1
 
-    # 3. Invertir colores de la imagen
-    imagen_invertida = 255 - imagen_8x8
-
-    # 4. Normalizar a rango 0-16
-    # Dividimos entre 255 (para tener 0-1) y multiplicamos por 16
-    imagen_procesada = (imagen_invertida / 255.0) * 16
-
-    return imagen_procesada
+    print(nueva_img)
+    return nueva_img
 
 # ============================================================================
-# Paso 4: Calcular las distancias euclidianas con cada
+# PASO 4: Calcular distancia euclidiana
 # ============================================================================
-
-def calcular_distancia_euclidiana(imagen1, imagen2):
-    """ Formula:
-    distancia = √[(p1-q1)² + (p2-q2)² + ... + (p64-q64)²]
-    """
-    return np.linalg.norm(imagen1.flatten() - imagen2.flatten())
-    #linalg es una funcion de numpy para operaciones con vectores
+def calcular_distancia(vector1, vector2):
+    diferencias_al_cuadrado = (vector1 - vector2)**2
+    suma = sum(diferencias_al_cuadrado)
+    distancia = suma**0.5
+    return distancia
 
 # ==================================================
 # PASO 6: ENCONTRAR LOS K VECINOS MÁS CERCANOS
 # ====================================================
-
-def encontrar_k_vecinos(mi_imagen, datos_dataset, etiquetas_dataset, k=3):
-
-    # aplanar la imagen (convertir 8x8 a vector de 64)
-    mi_vector = mi_imagen.flatten()
-
-    distancias = [] #aqui guardaremos todas las ditancias para luego comparar
-
-    # calcular distancia con cada imagen del dataset digits
+def encontrar_k_vecinos(imagen, datos_dataset, etiquetas_dataset, k=3):
+    mi_vector = imagen.flatten()
+    distancias = []
     for i in range(len(datos_dataset)):
         vector_dataset = datos_dataset[i]
+        distancia = calcular_distancia(mi_vector, vector_dataset)
+        distancias.append((distancia, etiquetas_dataset[i]))
 
-        # calcular distancia euclidiana con numpy
-        distancia = np.linalg.norm(mi_vector - vector_dataset)
-
-        # agregamos a nuestra lista "distancias" el índice en el dataset, la distancia y la etiqueta del digito
-        distancias.append((i, distancia, etiquetas_dataset[i]))
-
-    # Ordenar por distancia (de menor a mayor)
-    distancias.sort(key=lambda x: x[1]) #usamos lambda para ordenar por
-    # el segundo elemento de la lista que son las distancias
-
-    # Tomar los K primeros (los más cercanos), en este caso tomaremos los 3 primeros knn
-    k_vecinos = distancias[:3]
+    distancias.sort()
+    k_vecinos = distancias[:k]
 
     return k_vecinos
 
 # ============================================================================
 # paso 7: clasificar los digitos q ingresamos
 # ============================================================================
-
 def clasificar_el_digito(mi_imagen, vecinos_3):
-    #clasificamos en base a los 3 vecinos mas cercanos
-    # en caso de q los 3 targets sean diferentes nuestra solucion sera usar 5 vecinos
-    # mas cercanos y elegir en base a ello
+        etiquetas = []
+        for vecino in vecinos_3:
+            etiquetas.append(vecino[1])
 
-    # extraer solo las etiquetas de los 3 vecinos
-    etiquetas_3 = []
-    for tupla in vecinos_3:
-        etiquetas_3.append(tupla[2])  # tupla[2] es la etiqueta
+        mejor_numero = 0
+        mejor_cantidad = 0
 
-    # contar cuántas veces aparece cada etiqueta
-    conteo = Counter(etiquetas_3)
-    mas_comun, frecuencia = conteo.most_common(1)[0]
+        for numero in range(10):
+            cantidad = etiquetas.count(numero)
+            if cantidad > mejor_cantidad:
+                mejor_cantidad = cantidad
+                mejor_numero = numero
 
-    if frecuencia >= 2:
-        #si haay mayoría (2 o 3 iguales) usamos esa etiqueta
-        return mas_comun
-    else:
-        # si los 3 son diferences buscaremos 5 vecinos para más precision
-        print("    (Los 3 vecinos son diferentes, expandiendo a 5 vecinos...)")
-        vecinos_5 = encontrar_k_vecinos(mi_imagen, datos_dataset, etiquetas_dataset, k=5)
+        if mejor_cantidad >= 2:
+            return mejor_numero
+        else:
+            vecinos_5 = encontrar_k_vecinos(mi_imagen, datos_dataset, etiquetas_dataset, k=5)
+            etiquetas_5 = []
+            for vecino in vecinos_5:
+                etiquetas_5.append(vecino[1])
 
-        # extraer etiquetas de los 5 vecinos
-        etiquetas_5 = []
-        for tupla in vecinos_5:
-            etiquetas_5.append(tupla[2])
+            mejor_numero_5 = 0
+            mejor_cantidad_5 = 0
+            for numero in range(10):
+                cantidad = etiquetas_5.count(numero)
+                if cantidad > mejor_cantidad_5:
+                    mejor_cantidad_5 = cantidad
+                    mejor_numero_5 = numero
 
-        # hacer votación con 5 vecinos
-        conteo_5 = Counter(etiquetas_5)
-        ganador, _ = conteo_5.most_common(1)[0]
-        return ganador
+            return mejor_numero_5
 
-# ============================================================================
-# PASO 7: PROGRAMA PRINCIPAL
-# ============================================================================
 
-print("\n" + "="*70)
-print("SISTEMA DE RECONOCIMIENTO DE DÍGITOS ESCRITOS A MANO")
-print("="*70)
+#ejecutar funciones con las
+lista=["cero","uno","dos","tres","cuatro","cinco","seis","siete","ocho","nueve"]
+for i in lista:
+    ruta= "./imagenes/"+i+".png"
+    imagen = procesar_imagen(ruta)
+    vecinos_3 = encontrar_k_vecinos(imagen, datos_dataset, etiquetas_dataset, k=3)
+    resultado = clasificar_el_digito(imagen, vecinos_3)
 
-# Solicitar datos al usuario
-ruta = input("\nRuta de la imagen: ")
-etiqueta_real = int(input("¿Qué número es realmente? (0-9): "))
+    print("El dígito detectado es:", resultado)
 
-# Procesar la imagen
-print("\n[1] Procesando imagen...")
-mi_imagen = procesar_imagen(ruta)
-print("    ✓ Imagen procesada correctamente")
-
-# Encontrar los 3 vecinos más cercanos
-print("\n[2] Buscando los 3 vecinos más cercanos...")
-vecinos = encontrar_k_vecinos(mi_imagen, datos_dataset, etiquetas_dataset, k=3)
-print("    ✓ Vecinos encontrados")
-
-# Extraer solo las etiquetas
-etiquetas_vecinos = []
-for tupla in vecinos:
-    etiquetas_vecinos.append(tupla[2])
-
-# Clasificar el dígito
-print("\n[3] Clasificando dígito...")
-prediccion = clasificar_el_digito(mi_imagen, vecinos)
-
-# Mostrar resultados
-print("\n" + "="*70)
-print("RESULTADOS")
-print("="*70)
-print(f"\nNúmero real: {etiqueta_real}")
-print(f"Targets de los 3 vecinos más cercanos: {etiquetas_vecinos}")
-
-print("\n" + "-"*70)
-print("Detalles de los vecinos:")
-for i, (indice, distancia, etiqueta) in enumerate(vecinos, 1):
-    print(f"  Vecino {i}: Etiqueta={etiqueta}, Distancia={distancia:.2f}")
-print("-"*70)
-
-print(f"\n🤖 Soy la inteligencia artificial, y he detectado que el dígito")
-print(f"   ingresado corresponde al número {prediccion}")
-
-if prediccion == etiqueta_real:
-    print("\n✅ ¡CORRECTO! La IA clasificó correctamente el dígito")
-else:
-    print(f"\n❌ INCORRECTO. El número real era {etiqueta_real}")
-
-print("\n" + "="*70)
